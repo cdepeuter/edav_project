@@ -1,0 +1,127 @@
+---
+title: "R Notebook"
+output:
+  html_document: default
+  html_notebook: default
+---
+EDAV HW #4 
+Group: Daniel First, Karl Kamdem, Conrad De Peuter, Rebecca Peyser
+
+## I. Introduction
+
+### Background
+As became clear from the 2016 election, we live in a surprisingly and disturbingly divided country. The takeaway of many commentators was that our country has become divided into two separate groups: college-educated, atheistic, democrat elites living in a bubble of liberal values, while the rest of the country harbors a strong belief in God and conservative values. The Pew’s analysis of these results in 2012, 2014, and 2016 support this narrative.
+
+We are interesting in re-analysing the dataset on which the Pew report was based. Our hypothesis was that the Pew’s narrative is true but somewhat overblown and oversimplified. We hope to focus our study on the possibility that the truth is a bit more nuanced if we look closely. For example, grant that the country is more polarized today than before. Is it true that college educated people are becoming more liberal overall, on a large host of issues? Or is it possible that citizens’ perspectives on just one or two issues have become more polarized, and this makes it seem that views have become more liberal overall? 
+
+We will examine responses to the 10 “Ideological Consistency” questions, the 5 “Social Values” questions and 4 questions about race. We found the data by exploring polarization datasets online. The reader can find the datasets on this website: http://www.people-press.org/2012/04/15/1987-2012-values-survey-combined-dataset/. We chose to analyze the data Pew presented in 2012 because most of the purported social changes happened by that point, and the same questions were asked year after year in that data set.
+
+In what follows, I will list some of the claims that Pew makes, and then I will explain what our hypotheses are to explore these claims further.
+
+### Pew’s Claims
+Pew makes the following claims
+	(i) The country is becoming more polarized on any given value. For example, if asked a question such as “On a scale from 1 to 10, is it acceptable for a teacher in a public school to be homosexual?” fewer people report values in the middle, whereas more and more people report values on extremes.
+	(ii) People who have graduated college are increasingly consistently ideological. (source) This was derived from looking at responses to a set of 10 “Ideological Consistency” questions (source) about values. If someone gave the liberal response to at least 8 out of 10 questions, they are considered consistently liberal; if liberal for 5 and conservative for 5, they would not be considered consistently liberal. 
+	(iii) Belief in God has remained relatively stable 1987 - 2007, except with a minor drop 2007-2012. (Source) Consistently throughout all these years, over 80% of people say they never doubt God’s existence.
+	(iv) Adherence to conservative values has declined. (Source)  Millennials in particular have far more socially liberal values than their forebears of the Xer, Silent, and Boomer generation.
+
+Regarding each of these claims, we will examine certain hypotheses that aim to add nuance to the general claim. Regarding the aforementioned claims, here are some of the hypotheses we aim to examine:
+Regarding (i) and (ii) - Is it true that polarization is happening across the board, on all 10 ideological consistency questions, or are responses changing to just one or two variables? We hypothesize that responses to just one or two questions, e.g. homosexuality, are changing, and thus an overall narrative of increased polarization across the board would be not exact accurate.
+Regarding (iii and iv): Do these trends apply equally to people within each religion? What happens if we look specifically at Jews, for example: Do we see this shift happening away from conservative values? Do we see the same high percentage of belief in God? We suspect that subsetting this way will be revealing, because the vast majority of the respondents are Catholic and Protestant, which may be flooding the data. We will also subset by state and produce visualizations to explore trends in social values and belief in God by state.
+
+## II. Team
+Conrad will be making the visualizations showing ideological changes state by state using choropleth maps.
+Karl will be making the visualizations about how people’s attitudes towards race have changed over time, specifically subsetting by generation and by religion.
+Rebecca will subset by religion and look at how people’s responses to belief in God has changed over time within each religious group. Daniel will look at social values and how they have changed within each religious group.
+
+
+
+```{r}
+library(foreign)
+library(choroplethr)
+library(dplyr)
+library(ggplot2)
+
+
+pew <- read.spss("1987-2012_Values_Merge/1987-2012 Values Merge public.sav", to.data.frame=TRUE)
+
+```
+
+### III. Explore four variables
+Here, we explore how many times people of each ethnicity and religion were surveyed. The most commonly surveyed ethnicity-religion combinations in this survey are White Non-Hispanic Mainline and Evangelical Protestants. It is important for us as analysts to have a grasp of the distribution of identity-related variables, such as religion, in the surveyed population, so that we can then explore if subjects’ responses to the questionnaire are correlated with these variables, or what faceting based on these identity-related variables can reveal about subgroups within the population.
+
+```{r}
+# plots for writeup
+by_religion <- data.frame(table(pew$relign)[order(table(pew$relign), decreasing = TRUE)])
+
+not_other <-by_religion$Var1  != "Other Religion"
+
+by_religion <- rbind(by_religion[not_other,], by_religion[by_religion$Var1  == "Other Religion",])
+
+# make V1 an ordered factor
+by_religion$V1 <- factor(by_religion$Var1, levels = by_religion$Var1)
+by_religion$V1 <- factor(by_religion$Var1, levels = levels(by_religion$V1)[length(by_religion$Var1):1])
+
+ggplot(by_religion) + geom_bar(aes(x=V1, y=Freq), stat='identity') + coord_flip() + ggtitle("Religions in Pew data") + xlab("Religion") + ylab("Count")
+
+
+```
+
+
+
+Here, we visualize the number of responses per year. It can be observed that there are far fewer responses between 1994 and 2002. 
+
+
+```{r}
+# how many people each year
+pew_by_year <- pew %>% group_by(year) %>% summarise(responses = n())
+
+# plot
+ggplot(pew_by_year, aes(x=year)) + geom_line(aes(y=responses)) + ggtitle("Number of responses each year") 
+
+
+
+```
+
+
+
+
+```{r, fig.height=7, fig.width=12}
+
+# racism by year
+whos_racist <- pew %>% group_by(year, q10k) %>% summarise(count = n())
+
+whos_racist_start_end <- whos_racist[whos_racist$year == 1987 | whos_racist$year == 2012, ]
+whos_racist_start_end <- whos_racist_start_end[1:10,]
+
+year_sum <- data.frame(whos_racist_start_end %>% group_by(year) %>% summarise(tot = sum(count)))
+rownames(year_sum) <- year_sum$year
+to_divide <- year_sum[as.character(whos_racist_start_end$year),"tot"]
+whos_racist_start_end$count <- whos_racist_start_end$count / to_divide
+
+
+ggplot(whos_racist_start_end) + geom_bar(aes(x=q10k, y=count), stat='identity') + facet_grid(~year)+xlab("Response") + ylab("%")+ggtitle("I think it's all right for blacks and whites to date each other ")
+
+
+```
+
+Responses to the question “I think it’s all right for blacks and whites to date each other” in the first (1987) and last (2012) years of the data set. Clearly the general opinion of society has changed throughout time.
+
+
+
+```{r}
+counts <- data.frame(table(pew$state)[order(table(pew$state), decreasing = TRUE)])
+
+counts$rev <- factor(counts$Var1, levels = counts$Var1)
+counts$rev <- factor(counts$Var1, levels = levels(counts$rev)[length(counts$Var1):1])
+
+ggplot(counts) + geom_bar(aes(x = rev, y = Freq), stat = 'identity') + 
+  coord_flip() +
+  ggtitle('Number of responses per state') +
+  theme(plot.title = element_text(size = 10))
+
+```
+
+
+This plot represents the number of responses to the survey for each state in decreasing order.
+
